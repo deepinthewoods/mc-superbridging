@@ -113,36 +113,16 @@ public final class BridgingController {
 	}
 
 	private void tryStartBridging(ClientPlayerEntity player) {
-		if (!player.isOnGround() || player.isSpectator() || player.getAbilities().flying) {
+		BlockPos candidate = findStartCandidate(player);
+		if (candidate == null) {
 			return;
 		}
 
-		HitResult result = player.raycast(START_RAYCAST_RANGE, 1.0F, false);
-		if (result.getType() != HitResult.Type.MISS) {
-			return;
-		}
-
-		int yLevel = player.getBlockPos().getY() - 1;
-		BlockPos target = resolveTargetFromAim(player, yLevel);
-		if (target == null) {
-			return;
-		}
-		ClientWorld world = (ClientWorld) player.getEntityWorld();
-
-		if (!world.isAir(target)) {
-			return;
-		}
-
-		BlockHitResult supportHit = createPlacementHit(player, target);
-		if (supportHit == null) {
-			return;
-		}
-
-		anchorBlock = target;
+		anchorBlock = candidate;
 		lastForward = getHorizontalForward(player);
 		state = State.BRIDGING;
 		consecutiveFailures = 0;
-		debug("Bridging mode engaged; anchor {}", target);
+		debug("Bridging mode engaged; anchor {}", anchorBlock);
 	}
 
 	private void performBridging(MinecraftClient client, ClientPlayerEntity player) {
@@ -409,6 +389,27 @@ public final class BridgingController {
 		return state == State.BRIDGING && !performingPlacement;
 	}
 
+	public boolean isBridging() {
+		return state == State.BRIDGING;
+	}
+
+	public boolean hasStartCandidate(MinecraftClient client) {
+		if (client == null) {
+			return false;
+		}
+
+		ClientPlayerEntity player = client.player;
+		if (player == null || client.world == null) {
+			return false;
+		}
+
+		if (!isPlaceableBlock(player.getMainHandStack())) {
+			return false;
+		}
+
+		return findStartCandidate(player) != null;
+	}
+
 	private void reset() {
 		state = State.IDLE;
 		anchorBlock = null;
@@ -422,5 +423,34 @@ public final class BridgingController {
 		if (debugEnabled) {
 			LOGGER.debug("[SuperBridging] " + message, args);
 		}
+	}
+
+	private BlockPos findStartCandidate(ClientPlayerEntity player) {
+		if (!player.isOnGround() || player.isSpectator() || player.getAbilities().flying) {
+			return null;
+		}
+
+		HitResult result = player.raycast(START_RAYCAST_RANGE, 1.0F, false);
+		if (result.getType() != HitResult.Type.MISS) {
+			return null;
+		}
+
+		int yLevel = player.getBlockPos().getY() - 1;
+		BlockPos target = resolveTargetFromAim(player, yLevel);
+		if (target == null) {
+			return null;
+		}
+
+		ClientWorld world = (ClientWorld) player.getEntityWorld();
+		if (!world.isAir(target)) {
+			return null;
+		}
+
+		BlockHitResult supportHit = createPlacementHit(player, target);
+		if (supportHit == null) {
+			return null;
+		}
+
+		return target;
 	}
 }
