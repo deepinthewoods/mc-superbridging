@@ -22,8 +22,9 @@ abstract class InGameHudMixin {
 
 	private static final Identifier BRIDGE_READY_TEXTURE = Identifier.of("superbridging", "hud/candidate_bridge_cursor");
 	private static final Identifier BRIDGE_ACTIVE_TEXTURE = Identifier.of("superbridging", "hud/active_bridge_cursor");
-	private static final int OVERLAY_SIZE = 15;
-	private static final int OVERLAY_HALF = OVERLAY_SIZE / 2;
+	private static final int CANDIDATE_OVERLAY_SIZE = 15;
+	private static final int ACTIVE_OVERLAY_WIDTH = 19;
+	private static final int ACTIVE_OVERLAY_HEIGHT = 15;
 
 	@Inject(method = "renderCrosshair", at = @At("TAIL"))
 	private void superbridging$decorateCrosshair(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
@@ -39,26 +40,23 @@ abstract class InGameHudMixin {
 			return;
 		}
 
-		int centerX = context.getScaledWindowWidth() / 2;
-		int centerY = context.getScaledWindowHeight() / 2;
-
 		if (startCandidate) {
-			drawCandidateGuide(context, centerX, centerY);
+			drawCandidateGuide(context);
 		}
 		if (bridgingActive) {
-			drawBridgingGuide(context, centerX, centerY);
+			drawBridgingGuide(context);
 		}
 	}
 
-	private void drawCandidateGuide(DrawContext context, int centerX, int centerY) {
-		int originX = centerX - OVERLAY_HALF;
-		int originY = centerY - OVERLAY_HALF;
-		context.drawGuiTexture(RenderPipelines.CROSSHAIR, BRIDGE_READY_TEXTURE, originX, originY, OVERLAY_SIZE, OVERLAY_SIZE);
+	private void drawCandidateGuide(DrawContext context) {
+		int originX = (context.getScaledWindowWidth() - CANDIDATE_OVERLAY_SIZE) / 2;
+		int originY = (context.getScaledWindowHeight() - CANDIDATE_OVERLAY_SIZE) / 2;
+		context.drawGuiTexture(RenderPipelines.CROSSHAIR, BRIDGE_READY_TEXTURE, originX, originY, CANDIDATE_OVERLAY_SIZE, CANDIDATE_OVERLAY_SIZE);
 	}
 
-	private void drawBridgingGuide(DrawContext context, int centerX, int centerY) {
-		int originX = centerX - OVERLAY_HALF;
-		int originY = centerY - OVERLAY_HALF;
-		context.drawGuiTexture(RenderPipelines.CROSSHAIR, BRIDGE_ACTIVE_TEXTURE, originX, originY, OVERLAY_SIZE, OVERLAY_SIZE);
+	private void drawBridgingGuide(DrawContext context) {
+		int originX = (context.getScaledWindowWidth() - ACTIVE_OVERLAY_WIDTH) / 2;
+		int originY = (context.getScaledWindowHeight() - ACTIVE_OVERLAY_HEIGHT) / 2;
+		context.drawGuiTexture(RenderPipelines.CROSSHAIR, BRIDGE_ACTIVE_TEXTURE, originX, originY, ACTIVE_OVERLAY_WIDTH, ACTIVE_OVERLAY_HEIGHT);
 	}
 }
