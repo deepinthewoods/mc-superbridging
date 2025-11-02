@@ -42,6 +42,12 @@ public final class BridgingController {
 		BRIDGING
 	}
 
+	private enum HotbarAvailability {
+		READY,
+		HOLDING_NON_BLOCK,
+		OUT_OF_BLOCKS
+	}
+
 	private final boolean debugEnabled;
 	private State state = State.IDLE;
 	private boolean useKeyPressedLastTick;
@@ -131,15 +137,19 @@ public final class BridgingController {
 			return;
 		}
 
-		if (!player.isOnGround() || player.isSpectator() || player.getAbilities().flying) {
-			debug("Player left viable ground; resetting");
+		if (player.isSpectator() || player.getAbilities().flying) {
+			debug("Player cannot bridge in this state; resetting");
 			reset();
 			return;
 		}
 
-		if (!ensureHotbarHasBlocks(player)) {
-			debug("No compatible blocks available; resetting");
-			reset();
+		HotbarAvailability hotbarState = ensureHotbarHasBlocks(player);
+		if (hotbarState == HotbarAvailability.OUT_OF_BLOCKS) {
+			consecutiveFailures = 0;
+			return;
+		}
+		if (hotbarState == HotbarAvailability.HOLDING_NON_BLOCK) {
+			consecutiveFailures = 0;
 			return;
 		}
 
@@ -336,49 +346,62 @@ public final class BridgingController {
 		return horizontal.normalize();
 	}
 
-	private boolean ensureHotbarHasBlocks(ClientPlayerEntity player) {
+	private HotbarAvailability ensureHotbarHasBlocks(ClientPlayerEntity player) {
 		ItemStack mainHand = player.getMainHandStack();
 		if (isPlaceableBlock(mainHand)) {
-			if (!matchesPrimed(mainHand) && primedStack.isEmpty()) {
+			if (primedStack.isEmpty() || !mainHand.isOf(primedStack.getItem())) {
 				primedStack = mainHand.copy();
 			}
-			return true;
+			return HotbarAvailability.READY;
 		}
 
-		int preferredSlot = -1;
-		int fallbackSlot = -1;
+		if (mainHand.isEmpty()) {
+			if (primedStack.isEmpty()) {
+				return HotbarAvailability.OUT_OF_BLOCKS;
+			}
+			int matchingSlot = findMatchingHotbarSlot(player);
+			if (matchingSlot >= 0) {
+				player.getInventory().setSelectedSlot(matchingSlot);
+				ItemStack swapped = player.getMainHandStack();
+				if (isPlaceableBlock(swapped) && matchesPrimed(swapped)) {
+					return HotbarAvailability.READY;
+				}
+			}
+			primedStack = ItemStack.EMPTY;
+			return HotbarAvailability.OUT_OF_BLOCKS;
+		}
+
+		boolean hasMatch = findMatchingHotbarSlot(player) >= 0;
+		if (!hasMatch) {
+			primedStack = ItemStack.EMPTY;
+		}
+		return hasAnyPlaceableHotbarBlock(player) ? HotbarAvailability.HOLDING_NON_BLOCK : HotbarAvailability.OUT_OF_BLOCKS;
+	}
+
+	private int findMatchingHotbarSlot(ClientPlayerEntity player) {
+		if (primedStack.isEmpty()) {
+			return -1;
+		}
 		for (int slot = 0; slot < 9; slot++) {
 			ItemStack stack = player.getInventory().getStack(slot);
-			if (!isPlaceableBlock(stack)) {
-				continue;
-			}
 			if (matchesPrimed(stack)) {
-				preferredSlot = slot;
-				break;
-			}
-			if (fallbackSlot < 0) {
-				fallbackSlot = slot;
+				return slot;
 			}
 		}
+		return -1;
+	}
 
-		int targetSlot = preferredSlot >= 0 ? preferredSlot : fallbackSlot;
-		if (targetSlot >= 0) {
-			player.getInventory().setSelectedSlot(targetSlot);
-			ItemStack selected = player.getInventory().getStack(targetSlot);
-			if (!selected.isEmpty()) {
-				primedStack = selected.copy();
+	private boolean hasAnyPlaceableHotbarBlock(ClientPlayerEntity player) {
+		for (int slot = 0; slot < 9; slot++) {
+			if (isPlaceableBlock(player.getInventory().getStack(slot))) {
+				return true;
 			}
-			return true;
 		}
-
 		return false;
 	}
 
 	private boolean matchesPrimed(ItemStack stack) {
-		if (primedStack.isEmpty()) {
-			return true;
-		}
-		return !stack.isEmpty() && stack.isOf(primedStack.getItem());
+		return !primedStack.isEmpty() && !stack.isEmpty() && stack.isOf(primedStack.getItem());
 	}
 
 	private boolean isPlaceableBlock(ItemStack stack) {
