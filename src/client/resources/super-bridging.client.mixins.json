@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "ninja.trek.superbridging.mixin.client",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"ExampleClientMixin",
+		"ClientPlayerInteractionManagerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
