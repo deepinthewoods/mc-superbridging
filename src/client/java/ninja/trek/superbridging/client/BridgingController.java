@@ -182,9 +182,8 @@ public final class BridgingController {
 
 			BlockHitResult hit = createPlacementHit(player, pos);
 			if (hit == null) {
-				debug("Lost support near {}; exiting bridging", pos);
-				reset();
-				return;
+				debug("No support yet for {}; skipping this tick", pos);
+				continue;
 			}
 
 			ActionResult actionResult;
@@ -215,21 +214,24 @@ public final class BridgingController {
 		BlockPos underFoot = BlockPos.ofFloored(player.getX(), player.getY() - 1.0D, player.getZ());
 		positions.add(underFoot);
 
+		double absX = Math.abs(forward.x);
+		double absZ = Math.abs(forward.z);
 		int stepX = resolveStep(forward.x);
 		int stepZ = resolveStep(forward.z);
 		if (stepX == 0 && stepZ == 0) {
 			Direction facing = player.getHorizontalFacing();
 			stepX = facing.getOffsetX();
 			stepZ = facing.getOffsetZ();
-		}
+		 }
 
-		addTarget(positions, underFoot, stepX, 0, 0);
-		addTarget(positions, underFoot, 0, 0, stepZ);
+		if (absX >= absZ) {
+			addTarget(positions, underFoot, stepX, 0, 0);
+		} else {
+			addTarget(positions, underFoot, 0, 0, stepZ);
+		}
 
 		if (stepX != 0 && stepZ != 0) {
 			addTarget(positions, underFoot, stepX, 0, stepZ);
-			addTarget(positions, underFoot, stepX * 2, 0, stepZ);
-			addTarget(positions, underFoot, stepX, 0, stepZ * 2);
 			addTarget(positions, underFoot, stepX * 2, 0, stepZ * 2);
 		} else {
 			addTarget(positions, underFoot, stepX * 2, 0, stepZ * 2);
