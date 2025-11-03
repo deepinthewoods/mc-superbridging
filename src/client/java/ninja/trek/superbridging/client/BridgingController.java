@@ -4,6 +4,9 @@ import com.mojang.logging.LogUtils;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.SlabBlock;
+import net.minecraft.block.enums.SlabType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.ClientPlayerInteractionManager;
@@ -170,7 +173,8 @@ public final class BridgingController {
 				continue;
 			}
 
-			BlockHitResult hit = createPlacementHit(player, pos);
+			ItemStack placingStack = player.getMainHandStack();
+			BlockHitResult hit = createPlacementHit(player, pos, placingStack);
 			if (hit == null) {
 				debug("No support yet for {}; skipping this tick", pos);
 				continue;
@@ -265,7 +269,7 @@ public final class BridgingController {
 		return BlockPos.ofFloored(intersection.x, yLevel, intersection.z);
 	}
 
-	private BlockHitResult createPlacementHit(ClientPlayerEntity player, BlockPos placeAt) {
+	private BlockHitResult createPlacementHit(ClientPlayerEntity player, BlockPos placeAt, ItemStack stack) {
 		ClientWorld world = (ClientWorld) player.getEntityWorld();
 		BlockPos bestSupport = null;
 		Direction bestFace = null;
@@ -313,6 +317,11 @@ public final class BridgingController {
 
 		Vec3d faceVector = new Vec3d(bestFace.getOffsetX(), bestFace.getOffsetY(), bestFace.getOffsetZ()).multiply(0.5D);
 		Vec3d hitPos = Vec3d.ofCenter(bestSupport).add(faceVector);
+		if (isSlab(stack) && bestFace.getAxis().isHorizontal()) {
+			double baseY = placeAt.getY();
+			double offset = shouldPlaceTopHalf(player) ? 0.875D : 0.125D;
+			hitPos = new Vec3d(hitPos.x, baseY + offset, hitPos.z);
+		}
 		return new BlockHitResult(hitPos, bestFace, bestSupport, false);
 	}
 
@@ -408,6 +417,29 @@ public final class BridgingController {
 		return !stack.isEmpty() && stack.getItem() instanceof BlockItem;
 	}
 
+	private boolean isSlab(ItemStack stack) {
+		if (stack.isEmpty() || !(stack.getItem() instanceof BlockItem blockItem)) {
+			return false;
+		}
+		return blockItem.getBlock() instanceof SlabBlock;
+	}
+
+	private boolean shouldPlaceTopHalf(ClientPlayerEntity player) {
+		ClientWorld world = (ClientWorld) player.getEntityWorld();
+		BlockPos footPos = BlockPos.ofFloored(player.getX(), player.getY() - 0.0001D, player.getZ());
+		BlockState state = world.getBlockState(footPos);
+		if (state.getBlock() instanceof SlabBlock && state.contains(SlabBlock.TYPE)) {
+			SlabType type = state.get(SlabBlock.TYPE);
+			if (type == SlabType.TOP) {
+				return true;
+			}
+			if (type == SlabType.BOTTOM) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	public boolean shouldSuppressManualPlacement() {
 		return state == State.BRIDGING && !performingPlacement;
 	}
@@ -469,7 +501,7 @@ public final class BridgingController {
 			return null;
 		}
 
-		BlockHitResult supportHit = createPlacementHit(player, target);
+		BlockHitResult supportHit = createPlacementHit(player, target, player.getMainHandStack());
 		if (supportHit == null) {
 			return null;
 		}
